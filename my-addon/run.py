@@ -4,11 +4,18 @@ import paho.mqtt.client as mqtt
 import requests
 import os
 import shutil
+import time
+import threading
+import yaml
 
-# 設定日誌格式
+# ------------------------------------------------------------
+# 🧾 設定日誌格式
+# ------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
-# 讀取 HA 傳入的選項設定
+# ------------------------------------------------------------
+# ⚙️ 讀取 HA 傳入的設定 (options.json)
+# ------------------------------------------------------------
 with open("/data/options.json", "r") as f:
     options = json.load(f)
 
@@ -18,17 +25,22 @@ MQTT_BROKER = options.get("mqtt_broker", "core-mosquitto")
 MQTT_PORT = int(options.get("mqtt_port", 1883))
 MQTT_USERNAME = options.get("mqtt_username", "")
 MQTT_PASSWORD = options.get("mqtt_password", "")
-LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")
+ZP2_FW_VERSION = options.get("zp2_fw_version", "T251205-S1")
+ZP2_FW_URL = options.get(
+    "zp2_fw_url",
+    "https://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
+)
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+BASE_URL = "http://supervisor/core/api"
 
 HEADERS = {
-    "Authorization": f"Bearer {LONG_TOKEN}",
-    "Content-Type": "application/json"
+    "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+    "Content-Type": "application/json",
 }
 
-# HA 標準 API 的 base URL
-BASE_URL = "http://homeassistant:8123/api"
-
-# 設定單位條件
+# ------------------------------------------------------------
+# 🧮 感測單位對照表(for ZS2)
+# ------------------------------------------------------------
 unit_conditions = {
     "ct": "°C",
     "t": "°C",
@@ -43,21 +55,10 @@ unit_conditions = {
     "rset": "rpm",
     "rpm": "rpm"
 }
-def is_device_registered(device_name, device_mac, candidate_sensors):
-    """檢查裝置是否已註冊，只要其中一個代表性實體存在即可"""
-    for sensor in candidate_sensors:
-        entity_id = f"sensor.{device_name}_{device_mac}_{sensor}"
-        url = f"{BASE_URL}/states/{entity_id}"
-        try:
-            response = requests.get(url, headers=HEADERS)
-            if response.status_code == 200:
-                logging.info(f"裝置 {device_name}_{device_mac} 已註冊（找到 {entity_id}）")
-                return True
-        except Exception as e:
-            logging.error(f"查詢 {entity_id} 發生錯誤: {e}")
-    return False
 
-# 新增這段 function：檢查是否需要回傳控制指令
+# ------------------------------------------------------------
+# 🔁 檢查是否需要回傳控制指令(for ZS2)
+# ------------------------------------------------------------
 def check_and_respond_control(client, topic, message_json):
     parts = topic.split('/')
     if len(parts) < 3:
@@ -75,74 +76,21 @@ def check_and_respond_control(client, topic, message_json):
         client.publish(control_topic, control_payload)
         logging.info(f"Sent control message to {control_topic}: {control_payload}")
 
-
-        
-# 當連線成功時執行
+# ------------------------------------------------------------
+# 🔗 MQTT 連線成功
+# ------------------------------------------------------------
 def on_connect(client, userdata, flags, rc):
     logging.info(f"Connected to MQTT broker with result code {rc}")
     for topic in TOPICS:
         client.subscribe(topic)
         logging.info(f"Subscribed to topic: {topic}")
 
-def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_name):
-    """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
-    # 生成 topic
-    topic = f"{device_name}/{device_mac}/data"
-
-    # 基本 config
-    config = {
-        "name": sensor_name,
-        "state_topic": topic,
-        "expire_after": 300,
-        "value_template": f"{{{{ value_json.{sensor_type}.{sensor_name} }}}}",
-        "unique_id": f"{device_name}_{device_mac}_{sensor_name}",
-        "state_class": "measurement",
-        "force_update": True,
-        "device": {
-            "identifiers": f"{device_name}_{device_mac}",
-            "name": f"{device_name}_{device_mac}",
-            "model": device_name,
-            "manufacturer": "CurieJet"
-        }
-    }
-
-    # 如果有單位才加上
-    if sensor_name in unit_conditions:
-        config["unit_of_measurement"] = unit_conditions[sensor_name]
-
-    return config
-
-def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sensor_name):
-    """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
-    # 生成 topic
-    topic = f"{device_name}/{device_mac}/data"
-
-    # 基本 config
-    config = {
-        "name": sensor_name,
-        "state_topic": topic,
-        "expire_after": 300,
-        "value_template": f"{{{{ value_json.{sensor_type}.{sensor_name} }}}}",
-        "unique_id": f"{device_name}_{device_mac}_{sensor_name}",
-        "device": {
-            "identifiers": f"{device_name}_{device_mac}",
-            "name": f"{device_name}_{device_mac}",
-            "model": device_name,
-            "manufacturer": "CurieJet"
-        }
-    }
-
-    # 如果有單位才加上
-    if sensor_name in unit_conditions:
-        config["unit_of_measurement"] = unit_conditions[sensor_name]
-
-    return config
-
-		
-# 處理 MQTT 訊息並產生 Discovery 設定
+# ------------------------------------------------------------
+# 📨 處理 MQTT 訊息
+# ------------------------------------------------------------
 def on_message(client, userdata, msg):
     payload = msg.payload.decode()
-    logging.info(f"Received message on {msg.topic}: {payload}")
+    # logging.info(f"Received message on {msg.topic}: {payload}")
 
     try:
         # 先解析 JSON
@@ -156,79 +104,183 @@ def on_message(client, userdata, msg):
         if len(topic_parts) < 3:
             logging.warning(f"Invalid topic format: {msg.topic}")
             return
-        device_name = topic_parts[0]
-        device_mac = topic_parts[1]
-		
-        # 準備感測器名稱列表
-        candidate_sensors = (
-                list(message_json.get("data", {}).keys()) +
-                list(message_json.get("data1", {}).keys()) +
-                list(message_json.get("textdata", {}).keys())
-            )
-        # candidate_sensors = list(message_json.get("data", {}).keys()) + list(message_json.get("data1", {}).keys() + list(message_json.get("textdata", {}).keys())
-        # 裝置已註冊，跳過 discovery 設定
-        if is_device_registered(device_name, device_mac, candidate_sensors):
-            return  
-            
-        if not device_name or not device_mac:
-            logging.warning(f"Missing deviceName or deviceMac in message: {payload}")
+        device_name = topic_parts[0]    # "ZP2"
+        device_mac = topic_parts[1]     # number
+        message_type = topic_parts[2]   # "data" or "control"
+
+        fw = message_json.get("FW")
+
+        if device_name != "ZP2" or message_type != "data":
             return
         
-        # 生成對應的 MQTT Discovery 配置
-        discovery_configs = []
-        
-        # 處理 data 欄位的感測器
-        data_sensors = message_json.get("data", {})
-        for sensor, value in data_sensors.items():
-            config = generate_mqtt_discovery_config(device_name, device_mac, "data", sensor)
-            discovery_configs.append(config)
+        if fw is None:
+            logging.info(f"[ZP2] {device_name}/{device_mac} payload 無 FW，跳過")
+            return
 
-        # 處理 data1 欄位的感測器
-        data1_sensors = message_json.get("data1", {})
-        for sensor, value in data1_sensors.items():
-            config = generate_mqtt_discovery_config(device_name, device_mac, "data1", sensor)
-            discovery_configs.append(config)
+        if fw != ZP2_FW_VERSION:
+            control_topic = f"{device_name}/{device_mac}/control"
+            ota_payload = json.dumps({"Ota": ZP2_FW_URL})
+            client.publish(control_topic, ota_payload)
+            logging.info(
+                f"[ZP2] FW({fw}) != 設定({ZP2_FW_VERSION}) → 發送 OTA 到 {control_topic}: {ota_payload}"
+            )
+        else:
+            logging.info(f"[ZP2] FW({fw}) == 設定({ZP2_FW_VERSION})，無需更新")
+            return
 
-        # 處理 textdata 欄位的感測器
-        data1_sensors = message_json.get("textdata", {})
-        for sensor, value in data1_sensors.items():
-            config = generate_mqtt_discovery_textconfig(device_name, device_mac, "textdata", sensor)
-            discovery_configs.append(config)
 
-        # 推送 MQTT Discovery 配置到 HA
-        for config in discovery_configs:
-            discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{config['name']}/config"
-            mqtt_payload = json.dumps(config, indent=2)
-            client.publish(discovery_topic, mqtt_payload, retain=True)
-            logging.info(f"Published discovery config to {discovery_topic}")
+ 
+        # # "ZP2" # number #"Action"
+        threading.Thread(
+            target=clear_and_rediscover,
+            args=(client, device_name, device_mac, message_json),
+            daemon=True
+        ).start()
 
     except json.JSONDecodeError:
         logging.error(f"Failed to decode payload: {payload}")
     except Exception as e:
         logging.error(f"Error processing message: {e}")
 
-def create_mqtt_bridge_conf():
-    """ 複製 MQTT 桥接配置文件到目标目录 """
-    source_file = '/external_bridge.conf'  # 源文件路徑
-    target_directory = '/share/mosquitto/'  # 目標目錄路徑
+# ------------------------------------------------------------
+# 🏗️ 產生 MQTT Discovery Config（文字型）
+# ------------------------------------------------------------
+def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sensor_name,format_version):
+    """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
+    # 生成 topic (註冊用全小寫)
+    topic = f"{str(device_name)}/{str(device_mac)}/data"
 
+    # 基本 config
+    config = {
+        "name": sensor_name,
+        "state_topic": topic,
+        # "availability_topic": f"{device_name}/{device_mac}/status",  # ← 新增 LWT 主題
+        # "payload_available": "online",                 # LWT 上線訊息
+        # "payload_not_available": "offline",            # LWT 離線訊息
+        "expire_after": 300,
+        "value_template": f"{{{{ value_json.{sensor_name} }}}}",
+        "unique_id": f"{device_name}_{device_mac}_{sensor_name}",
+        "device": {
+            "identifiers": f"{device_name}_{device_mac}",
+            "name": f"{device_name}_{device_mac}",
+            "model": device_name,
+            "manufacturer": device_name,
+            # "sw_version": ADDON_VERSION,
+            "hw_version": str(format_version) if format_version else "unknown"
+        }
+    }
+    
+    # 如果有單位才加上
+    if sensor_name in unit_conditions:
+        config["unit_of_measurement"] = unit_conditions[sensor_name]
+
+    return config
+# ------------------------------------------------------------
+# 🔔 延遲 清除註冊 & 重新註冊
+# ------------------------------------------------------------
+def clear_and_rediscover(client, device_name, device_mac, message_json):
+    # 這裡直接用整個 JSON 當作欄位來源
+    data_sensors = message_json or {}
+
+    # 如果你不想把某些欄位註冊成 sensor（例如 MODEL），可以在這裡過濾
+    # 例如：
+    # for k in ["MODEL"]:
+    #     data_sensors.pop(k, None)
+
+    format_version = data_sensors.get("FW")
+
+    # ① 清除舊的 discovery
+    clear_discovery_for_device(client, device_name, device_mac)
+
+    # ② 等一小下，給 HA 時間處理
+    time.sleep(0.7)
+
+    # ③ 再發新的 discovery
+    discovery_configs = []
+
+    for sensor, value in data_sensors.items():
+        cfg = generate_mqtt_discovery_textconfig(
+            device_name, device_mac, "data", sensor, format_version
+        )
+        discovery_configs.append(cfg)
+
+    for cfg in discovery_configs:
+        discovery_topic = (
+            f"homeassistant/sensor/"
+            f"{str(device_name).lower()}_{str(device_mac).lower()}_{str(cfg['name']).lower()}/config"
+        )
+        payload = json.dumps(cfg, indent=2)
+        client.publish(discovery_topic, payload, retain=True)
+        logging.info(f"[rediscover] publish {discovery_topic}")
+
+# ------------------------------------------------------------
+# 🔔 清除註冊
+# ------------------------------------------------------------
+def clear_discovery_for_device(client, device_name, device_mac):
+    """
+    清掉 HA 裡面這台裝置所有對應的 MQTT Discovery config。
+    做法：查 HA 所有 state，找出 sensor.<dev>_<mac>_*，逐一發空的 retain。
+    config 相關全部小寫
+    """
+    dev = str(device_name).lower()
+    mac = str(device_mac).lower()
+    # dev = device_name
+    # mac = device_mac
+    prefix = f"sensor.{dev}_{mac}_"
+
+    url = f"{BASE_URL}/states"
     try:
-        # 確保目標目錄存在，如果不存在就創建
-        os.makedirs(target_directory, exist_ok=True)
-        
-        # 複製文件
-        shutil.copy(source_file, target_directory)
-        
-        # 記錄成功訊息
-        logging.info(f"File {source_file} has been copied to {target_directory}")
+        resp = requests.get(url, headers=HEADERS, timeout=5)
+        resp.raise_for_status()
+        states = resp.json()
     except Exception as e:
-        # 錯誤處理，記錄錯誤訊息
-        logging.error(f"Error copying file {source_file} to {target_directory}: {e}")
+        logging.error(f"[rediscover] 無法取得 HA states，改成只清本次欄位: {e}")
+        return False
+
+    cleared = 0
+    for s in states:
+        eid = s.get("entity_id", "")
+        if not eid.startswith(prefix):
+            continue
+
+        # sensor.xxx_yyy_zzz -> zzz
+        sensor_suffix = eid.split(prefix, 1)[1]
+        disc_topic = f"homeassistant/sensor/{dev}_{mac}_{sensor_suffix}/config"
+        client.publish(disc_topic, "", retain=True)
+        logging.info(f"[rediscover] clear {disc_topic}")
+        cleared += 1
+
+    logging.info(f"[rediscover] 已清除 {cleared} 筆舊的 discovery")
+    return True
+    
+# ------------------------------------------------------------
+# 🧱 複製 MQTT 橋接設定檔(for 中控橋接觀察數據 預設路徑192.168.51.8)
+# ------------------------------------------------------------
+# def create_mqtt_bridge_conf():
+#     """ 複製 MQTT 桥接配置文件到目标目录 """
+#     source_file = '/external_bridge.conf'  # 源文件路徑
+#     target_directory = '/share/mosquitto/'  # 目標目錄路徑
+
+#     try:
+#         # 確保目標目錄存在，如果不存在就創建
+#         os.makedirs(target_directory, exist_ok=True)
         
+#         # 複製文件
+#         shutil.copy(source_file, target_directory)
+        
+#         # 記錄成功訊息
+#         logging.info(f"File {source_file} has been copied to {target_directory}")
+#     except Exception as e:
+#         # 錯誤處理，記錄錯誤訊息
+#         logging.error(f"Error copying file {source_file} to {target_directory}: {e}")
+
+# ------------------------------------------------------------
+# 🚀 主程式
+# ------------------------------------------------------------
 def main():
     logging.info("Add-on started")
 
-    create_mqtt_bridge_conf()
+    # create_mqtt_bridge_conf()
 
     client = mqtt.Client()
 
