@@ -1,5 +1,5 @@
 ﻿name: "ZP2 integration"
-version: "1.0.4"
+version: "1.0.5"
 slug: "zp2_integration"
 description: "This Home Assistant add-on listens to MQTT messages and automatically handles
   ZP2 firmware checks, OTA updates, and MQTT Discovery for ZP2 devices.
@@ -39,7 +39,7 @@ options:
   mqtt_username: ""
   mqtt_password: ""
   zp2_fw_version: "T251205-S1"
-  zp2_fw_url: "https://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
+  zp2_fw_url: "http://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
   # HA_LONG_LIVED_TOKEN: ""
 
 schema:

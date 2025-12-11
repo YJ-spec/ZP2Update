@@ -28,7 +28,7 @@ MQTT_PASSWORD = options.get("mqtt_password", "")
 ZP2_FW_VERSION = options.get("zp2_fw_version", "T251205-S1")
 ZP2_FW_URL = options.get(
     "zp2_fw_url",
-    "https://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
+    "http://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
 )
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 BASE_URL = "http://supervisor/core/api"
