@@ -1,62 +1,31 @@
-# 3DRP Integration - 安裝與設定流程
+# ZP2 Integration Add-on 說明文件（精簡版）
 
-本文件說明如何在 Home Assistant 中正確安裝並設定 **3DRP Integration** 插件，  
-讓 ComeTrue® 裝置能自動被 Home Assistant 發現並建立感測器與控制項。
+## 功能簡介
 
-安裝步驟概述：
-1. 安裝並啟用 Mosquitto broker  
-2. 啟用 Home Assistant 的 MQTT 整合  
-3. 安裝並設定 3DRP Integration 插件  
+此 Home Assistant Add-on 用於整合 ZP2 裝置，主要提供兩大功能：
 
----
+1. 自動比對 ZP2 裝置回報的韌體版本（FW）
+2. 若裝置版本與設定不一致，則自動回覆 OTA 更新指令
 
-## 🧩 步驟 1. 安裝並啟用 Mosquitto broker
+Add-on 會從 MQTT 接收： ZP2/<MAC>/data
 
-1. 進入 Home Assistant → **設定 → 附加元件商店**  
-2. 搜尋並安裝 **Mosquitto broker**  
-3. 安裝完成後，**啟動** 該附加元件  
 
----
+並根據設定中的以下兩個參數判斷是否需要 OTA：
 
-## 🧠 步驟 2. 啟用 Home Assistant 的 MQTT 整合
+- `ZP2_FW_VERSION`
+- `ZP2_FW_URL`
 
-1. 前往 **設定 → 裝置與服務 → 新增整合**  
-2. 搜尋並選擇 **MQTT**  
-3. 在連線設定中填入：  
-```yaml
-logins: []
-require_certificate: false
-certfile: fullchain.pem
-keyfile: privkey.pem
-customize:
-  active: true
-  folder: mosquitto
-```
-4. 儲存設定  
 
----
+## ZP2 設定說明
 
-## ⚙️ 步驟 3. 安裝並設定 3DRP Integration 插件
+Add-on 安裝後，在：
 
-1. 回到 **附加元件商店**  
-2. 安裝 **3DRP Integration**
-3. 打開插件的「設定」頁面，填入相關 MQTT 參數  
-```yaml
-mqtt_topics: +/+/data,+/+/control
-mqtt_broker: core-mosquitto
-mqtt_port: 1883
-mqtt_username: test
-mqtt_password: test
-```
-4. 儲存設定  
-5. 啟動 **3DRP Integration** 插件  
+Home Assistant → 設定 → 外掛程式 → **ZP2 Integration** → 設定
 
----
+你會看到兩個與 ZP2 相關的重要欄位：
 
-## ✅ 完成！
+### 1. `zp2_fw_version`
+指定 ZP2 應該使用的目標韌體版本號。
 
-- ComeTrue® 裝置上線後會自動被 Home Assistant 偵測。  
-- 感測值與控制項會自動建立。  
-- 新增設備時無需重新設定。  
-
----
+### 2. `zp2_fw_url`
+指定 OTA 時 ZP2 要下載的韌體檔案 URL。

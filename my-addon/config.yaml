@@ -1,10 +1,9 @@
-﻿name: "3DRP integration"
-version: "2.4.8"
-slug: "3drp_integration"
-description: "This Home Assistant add-on listens to MQTT messages and dynamically generates 
-  MQTT Discovery configurations for ComeTrue® devices (e.g., 3DRP). 
-  It enables seamless integration of sensor and control data from various ComeTrue® models 
-  into your Home Assistant setup."
+﻿name: "ZP2 integration"
+version: "1.0.0"
+slug: "zp2_integration"
+description: "This Home Assistant add-on listens to MQTT messages and automatically handles
+  ZP2 firmware checks, OTA updates, and MQTT Discovery for ZP2 devices.
+  It enables seamless integration of ZP2 device data into Home Assistant."
 startup: "services"
 boot: "auto"
 arch:
