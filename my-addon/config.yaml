@@ -1,5 +1,5 @@
 ﻿name: "ZP2 integration"
-version: "1.0.2"
+version: "1.0.1"
 slug: "zp2_integration"
 description: "This Home Assistant add-on listens to MQTT messages and automatically handles
   ZP2 firmware checks, OTA updates, and MQTT Discovery for ZP2 devices.
