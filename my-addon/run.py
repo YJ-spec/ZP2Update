@@ -120,10 +120,11 @@ def on_message(client, userdata, msg):
         if fw != ZP2_FW_VERSION:
             control_topic = f"{device_name}/{device_mac}/control"
             ota_payload = json.dumps({"Ota": ZP2_FW_URL}, separators=(",", ":"))
-            client.publish(control_topic, ota_payload)
-            logging.info(
-                f"[ZP2] FW({fw}) != 設定({ZP2_FW_VERSION}) → 發送 OTA 到 {control_topic}: {ota_payload}"
-            )
+            threading.Thread(
+                target=send_ota_later,
+                args=(client, control_topic, ota_payload, fw, 3.0),  # 最後的 1.0 是延遲秒數
+                daemon=True,
+            ).start()
         else:
             logging.info(f"[ZP2] FW({fw}) == 設定({ZP2_FW_VERSION})，無需更新")
             return
@@ -141,6 +142,14 @@ def on_message(client, userdata, msg):
         logging.error(f"Failed to decode payload: {payload}")
     except Exception as e:
         logging.error(f"Error processing message: {e}")
+
+def send_ota_later(client, control_topic, ota_payload, fw, delay_sec=1.0):
+    """延遲一段時間再送 OTA 指令"""
+    time.sleep(delay_sec)
+    client.publish(control_topic, ota_payload)
+    logging.info(
+        f"[ZP2] FW({fw}) != 設定({ZP2_FW_VERSION}) → 已發送 OTA 到 {control_topic}: {ota_payload}"
+    )
 
 # ------------------------------------------------------------
 # 🏗️ 產生 MQTT Discovery Config（文字型）
