@@ -119,7 +119,7 @@ def on_message(client, userdata, msg):
 
         if fw != ZP2_FW_VERSION:
             control_topic = f"{device_name}/{device_mac}/control"
-            ota_payload = json.dumps({"Ota": ZP2_FW_URL})
+            ota_payload = json.dumps({"Ota": ZP2_FW_URL}, separators=(",", ":"))
             client.publish(control_topic, ota_payload)
             logging.info(
                 f"[ZP2] FW({fw}) != 設定({ZP2_FW_VERSION}) → 發送 OTA 到 {control_topic}: {ota_payload}"
