@@ -15,12 +15,12 @@ class OTARequestHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=directory, **kwargs)
 
 
-def start_ota_server_in_thread(root_dir: str = "/share/zp2_fw", port: int = 8088) -> threading.Thread:
+def start_ota_server_in_thread(root_dir: str = "/ota/zp2_fw", port: int = 8088) -> threading.Thread:
     """
     在背景 thread 啟動 HTTP Server，提供 root_dir 底下的靜態檔案。
     """
     if not os.path.isdir(root_dir):
-        print(f"[OTA] ⚠ 目錄不存在：{root_dir}（仍然啟動 HTTP，但請確認 /share 掛載與路徑）", flush=True)
+        print(f"[OTA] ⚠ 目錄不存在：{root_dir}（仍然啟動 HTTP，但請確認 /ota 掛載與路徑）", flush=True)
     else:
         print(f"[OTA] 使用根目錄：{root_dir}", flush=True)
 
@@ -46,7 +46,7 @@ def start_ota_server_in_thread(root_dir: str = "/share/zp2_fw", port: int = 8088
 
 
 if __name__ == "__main__":
-    root = os.environ.get("OTA_ROOT", "/share/zp2_fw")
+    root = os.environ.get("OTA_ROOT", "/ota/zp2_fw")
     port = int(os.environ.get("OTA_PORT", "8088"))
     print(f"[OTA] 以獨立模式啟動，root={root}, port={port}", flush=True)
     start_ota_server_in_thread(root, port).join()

@@ -14,7 +14,7 @@ COPY local_ota_server.py /local_ota_server.py
 # 拷貝前端模板 (整個資料夾)
 # COPY templates/ /templates/
 # COPY static/ /static/
-COPY share/ /share/
+COPY ota/ /ota/
 
 
 
