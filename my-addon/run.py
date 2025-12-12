@@ -30,6 +30,7 @@ ZP2_FW_URL = options.get(
     "zp2_fw_url",
     "http://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
 )
+ZP2_OUTBOUND_SETUP = bool(options.get("zp2_outbound_setup", False))  # ← 新增
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 BASE_URL = "http://supervisor/core/api"
 
@@ -121,16 +122,22 @@ def on_message(client, userdata, msg):
             control_topic = f"{device_name}/{device_mac}/control"
             ota_payload = json.dumps({"Ota": ZP2_FW_URL}, separators=(",", ":"))
             threading.Thread(
-                target=send_ota_later,
-                args=(client, control_topic, ota_payload, fw, 3.0),  # 最後的 1.0 是延遲秒數
+                target=send_later,
+                args=(client, control_topic, ota_payload, fw, 3.0, "OTA"),  # 最後的 1.0 是延遲秒數
                 daemon=True,
             ).start()
         else:
             logging.info(f"[ZP2] FW({fw}) == 設定({ZP2_FW_VERSION})，無需更新")
+            if ZP2_OUTBOUND_SETUP:
+                control_topic = f"{device_name}/{device_mac}/control"
+                ota_payload = json.dumps({"System":"reset"}, separators=(",", ":"))
+                threading.Thread(
+                    target=send_later,
+                    args=(client, control_topic, ota_payload, fw, 3.0, "reset"),  # 最後的 1.0 是延遲秒數
+                    daemon=True,
+                ).start()
             return
 
-
- 
         # # "ZP2" # number #"Action"
         threading.Thread(
             target=clear_and_rediscover,
@@ -143,13 +150,14 @@ def on_message(client, userdata, msg):
     except Exception as e:
         logging.error(f"Error processing message: {e}")
 
-def send_ota_later(client, control_topic, ota_payload, fw, delay_sec=1.0):
-    """延遲一段時間再送 OTA 指令"""
+def send_later(client, control_topic, ota_payload, fw, delay_sec=1.0, reason="OTA"):
+    """延遲一段時間再送控制指令 (OTA 或 System reset 等)"""
     time.sleep(delay_sec)
     client.publish(control_topic, ota_payload)
     logging.info(
-        f"[ZP2] FW({fw}) != 設定({ZP2_FW_VERSION}) → 已發送 OTA 到 {control_topic}: {ota_payload}"
+        f"[ZP2] ({reason}) 延遲 {delay_sec} 秒後發送到 {control_topic}: {ota_payload} (FW={fw})"
     )
+
 
 # ------------------------------------------------------------
 # 🏗️ 產生 MQTT Discovery Config（文字型）

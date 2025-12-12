@@ -1,5 +1,5 @@
 ﻿name: "ZP2 integration"
-version: "1.0.5"
+version: "1.0.6"
 slug: "zp2_integration"
 description: "This Home Assistant add-on listens to MQTT messages and automatically handles
   ZP2 firmware checks, OTA updates, and MQTT Discovery for ZP2 devices.
@@ -40,7 +40,7 @@ options:
   mqtt_password: ""
   zp2_fw_version: "T251205-S1"
   zp2_fw_url: "http://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
-  # HA_LONG_LIVED_TOKEN: ""
+  zp2_outbound_setup: false      # ← 新增：出場設定開關（預設關閉）
 
 schema:
   mqtt_topics: str
@@ -50,5 +50,5 @@ schema:
   mqtt_password: str?
   zp2_fw_version: str
   zp2_fw_url: str
-  
+  zp2_outbound_setup: bool       # ← 新增：布林勾選欄位
   # HA_LONG_LIVED_TOKEN: password?
