@@ -16,21 +16,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 # ------------------------------------------------------------
 # 🔧 先定義功能函式（一定要放在前面）
 # ------------------------------------------------------------
-
-def get_local_ip():
-    """
-    取得本機的 LAN IP（不是 127.0.0.1）
-    """
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))  # 不會真的連出去
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
-
-
 def load_ota_index(path="/ota/ota_index.yaml"):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -63,8 +48,9 @@ HEADERS = {
 # ------------------------------------------------------------
 # 🌐 自動偵測 IP + 固定 8088
 # ------------------------------------------------------------
-LOCAL_IP = get_local_ip()
-OTA_BASE_URL = f"http://{LOCAL_IP}:8088"
+OTA_IP = options.get("local_ip")
+OTA_BASE_URL = f"http://{OTA_IP}:8088"
+logging.info(f"[OTA] 使用 ota_ip={OTA_IP} → OTA_BASE_URL={OTA_BASE_URL}")
 # ------------------------------------------------------------
 # 📦 設定要用哪個 Firmware Profile
 # ------------------------------------------------------------
