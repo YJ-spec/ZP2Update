@@ -1,5 +1,5 @@
 ﻿name: "ZP2 integration"
-version: "1.0.7"
+version: "1.0.7-beta"
 slug: "zp2_integration"
 description: "This Home Assistant add-on listens to MQTT messages and automatically handles
   ZP2 firmware checks, OTA updates, and MQTT Discovery for ZP2 devices.
@@ -27,10 +27,12 @@ homeassistant_api: true
 # 在 Add-on 頁面顯示「Open Web UI」按鈕（連到 /status）
 # webui: "http://[HOST]:[PORT:8099]/status"
 # panel_icon: "mdi:view-list-outline"
+ingress: false
+ports:
+  "8088/tcp": 8088
 
 map:
   - share:rw
-
 
 options:
   mqtt_topics: "+/+/data,+/+/control"

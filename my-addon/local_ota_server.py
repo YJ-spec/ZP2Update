@@ -8,48 +8,45 @@ import os
 
 class OTARequestHandler(http.server.SimpleHTTPRequestHandler):
     """
-    支援多層資料夾的靜態檔案伺服器。
+    簡單的靜態檔案伺服器。
     directory 參數會指定 OTA 根目錄。
     """
     def __init__(self, *args, directory=None, **kwargs):
         super().__init__(*args, directory=directory, **kwargs)
 
-    # 避免 log 太吵
-    def log_message(self, format, *args):
-        print(f"[OTA] {self.address_string()} - {format % args}")
 
-
-def start_ota_server_in_thread(root_dir: str, port: int) -> threading.Thread:
+def start_ota_server_in_thread(root_dir: str = "/share/zp2_fw", port: int = 8088) -> threading.Thread:
     """
-    在背景 thread 啟動 OTA HTTP 伺服器。
-    root_dir: OTA 根目錄，例如 /share/zp2_fw
-    port: 對外 HTTP 連接埠，例如 8088
+    在背景 thread 啟動 HTTP Server，提供 root_dir 底下的靜態檔案。
     """
-    os.makedirs(root_dir, exist_ok=True)
+    if not os.path.isdir(root_dir):
+        print(f"[OTA] ⚠ 目錄不存在：{root_dir}（仍然啟動 HTTP，但請確認 /share 掛載與路徑）", flush=True)
+    else:
+        print(f"[OTA] 使用根目錄：{root_dir}", flush=True)
 
-    def _run_server():
-        print(f"[OTA] Root: {root_dir}")
-        print(f"[OTA] Listen on: 0.0.0.0:{port}")
-        print("[OTA] 例如：/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin")
-        print("[OTA] → http://<HA_IP>:%d/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin" % port)
+    handler = functools.partial(OTARequestHandler, directory=root_dir)
 
-        handler = functools.partial(OTARequestHandler, directory=root_dir)
+    class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+        allow_reuse_address = True
 
-        with socketserver.TCPServer(("", port), handler) as httpd:
+    def _run():
+        with ThreadingTCPServer(("", port), handler) as httpd:
+            print(f"[OTA] HTTP server 啟動：http://0.0.0.0:{port}/", flush=True)
+            print(f"[OTA] 例如：http://<HA_IP>:{port}/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin", flush=True)
             try:
                 httpd.serve_forever()
             except KeyboardInterrupt:
-                print("[OTA] 收到中斷，關閉伺服器...")
+                print("[OTA] 收到中斷，關閉伺服器...", flush=True)
             finally:
                 httpd.server_close()
 
-    t = threading.Thread(target=_run_server, daemon=True)
+    t = threading.Thread(target=_run, daemon=True)
     t.start()
     return t
 
 
-# 單獨執行這支檔案時，也可以直接跑（方便你單機測試）
 if __name__ == "__main__":
     root = os.environ.get("OTA_ROOT", "/share/zp2_fw")
     port = int(os.environ.get("OTA_PORT", "8088"))
+    print(f"[OTA] 以獨立模式啟動，root={root}, port={port}", flush=True)
     start_ota_server_in_thread(root, port).join()
