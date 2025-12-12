@@ -8,12 +8,16 @@ COPY config.yaml /config.yaml
 COPY run.py /run.py
 # COPY 3drp_show.py /3drp_show.py
 # COPY external_bridge.conf /external_bridge.conf
-# COPY launcher.py /launcher.py
+COPY launcher.py /launcher.py
+COPY local_ota_server.py /local_ota_server.py
 
 # 拷貝前端模板 (整個資料夾)
 # COPY templates/ /templates/
-# COPY static/ /static/
+COPY static/ /static/
+COPY shared/ /shared/
+
+
 
 # 單一入口：同時啟兩支程式
-# CMD ["python3", "/launcher.py"]
-CMD ["python3", "/run.py"]
+CMD ["python3", "/launcher.py"]
+# CMD ["python3", "/run.py"]

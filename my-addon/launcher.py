@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     # 同時啟動兩支
     p1 = start(["python3", "/run.py"])          # MQTT 發佈/Discovery
-    # p2 = start(["python3", "/3drp_show.py"])    # Flask HTTP API/Status
+    p2 = start(["python3", "/local_ota_server.py"])    # Flask HTTP API/Status
 
     # 任何一支先退出，就把另一支也關掉並跟著退出
     exit_code = 0
