@@ -1,5 +1,5 @@
 ﻿name: "ZP2 integration"
-version: "1.0.7-beta5"
+version: "1.0.7-beta6"
 slug: "zp2_integration"
 description: "This Home Assistant add-on listens to MQTT messages and automatically handles
   ZP2 firmware checks, OTA updates, and MQTT Discovery for ZP2 devices.
@@ -41,19 +41,20 @@ options:
   mqtt_topics: "+/+/data,+/+/control"
   mqtt_broker: "core-mosquitto"
   mqtt_port: 1883
-  mqtt_username: ""
-  mqtt_password: ""
+  mqtt_username: "test"
+  mqtt_password: "test"
 
 
 
 schema:
   local_ip: str
+  zp2_outbound_setup: bool       # ← 新增：布林勾選欄位
+  zp2_fw_profile: list(zp2_5_0_20251205_s01|test)
   mqtt_topics: str
   mqtt_broker: str
   mqtt_port: int
   mqtt_username: str?
   mqtt_password: str?
   # ota_ip: str
-  zp2_fw_profile: list(zp2_5_0_20251205_s01|test)
-  zp2_outbound_setup: bool       # ← 新增：布林勾選欄位
+
   
