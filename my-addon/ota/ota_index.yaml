@@ -1,7 +1,7 @@
 firmwares:
   - id: zp2_5_0_20251205_s01
     model: ZP2
-    version: T251205-S1
+    version: T251202-S1
     path: STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin
     note: "ZP2 2025-12-02 S01 單機版"
 
