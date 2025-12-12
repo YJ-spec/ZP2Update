@@ -7,11 +7,39 @@ import shutil
 import time
 import threading
 import yaml
+import socket
 
 # ------------------------------------------------------------
 # 🧾 設定日誌格式
 # ------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+# ------------------------------------------------------------
+# 🔧 先定義功能函式（一定要放在前面）
+# ------------------------------------------------------------
+
+def get_local_ip():
+    """
+    取得本機的 LAN IP（不是 127.0.0.1）
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # 不會真的連出去
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def load_ota_index(path="/data/ota_index.yaml"):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        fw_list = data.get("firmwares", [])
+        return {fw["id"]: fw for fw in fw_list if "id" in fw}
+    except Exception as e:
+        logging.error(f"[OTA] 載入 ota_index.yaml 失敗：{e}")
+        return {}
 
 # ------------------------------------------------------------
 # ⚙️ 讀取 HA 傳入的設定 (options.json)
@@ -25,12 +53,6 @@ MQTT_BROKER = options.get("mqtt_broker", "core-mosquitto")
 MQTT_PORT = int(options.get("mqtt_port", 1883))
 MQTT_USERNAME = options.get("mqtt_username", "")
 MQTT_PASSWORD = options.get("mqtt_password", "")
-ZP2_FW_VERSION = options.get("zp2_fw_version", "T251205-S1")
-ZP2_FW_URL = options.get(
-    "zp2_fw_url",
-    "http://mjgrd2fw.s3.ap-northeast-1.amazonaws.com/STM32/ZP2/fota-ZP2-5-0-20251205-S01.bin"
-)
-ZP2_OUTBOUND_SETUP = bool(options.get("zp2_outbound_setup", False))  # ← 新增
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 BASE_URL = "http://supervisor/core/api"
 
@@ -38,6 +60,33 @@ HEADERS = {
     "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
     "Content-Type": "application/json",
 }
+# ------------------------------------------------------------
+# 🌐 自動偵測 IP + 固定 8088
+# ------------------------------------------------------------
+LOCAL_IP = get_local_ip()
+OTA_BASE_URL = f"http://{LOCAL_IP}:8088"
+# ------------------------------------------------------------
+# 📦 設定要用哪個 Firmware Profile
+# ------------------------------------------------------------
+ZP2_FW_PROFILE = options.get("zp2_fw_profile", "zp2_5_0_20251205_s01")
+ZP2_OUTBOUND_SETUP = bool(options.get("zp2_outbound_setup", False))
+# ------------------------------------------------------------
+# 📂 讀取 ota_index.yaml
+# ------------------------------------------------------------
+OTA_INDEX = load_ota_index()
+CURRENT_FW = OTA_INDEX.get(ZP2_FW_PROFILE)
+
+if not CURRENT_FW:
+    logging.error(f"[OTA] 找不到 FW profile：{ZP2_FW_PROFILE}，停用 OTA 功能")
+    ZP2_FW_VERSION = None
+    ZP2_FW_URL = None
+else:
+    ZP2_FW_VERSION = CURRENT_FW.get("version")
+    rel_path = CURRENT_FW.get("path", "").lstrip("/")
+    ZP2_FW_URL = f"{OTA_BASE_URL}/{rel_path}"
+    logging.info(
+        f"[OTA] 使用 profile={ZP2_FW_PROFILE}, version={ZP2_FW_VERSION}, url={ZP2_FW_URL}"
+    )
 
 # ------------------------------------------------------------
 # 🧮 感測單位對照表(for ZS2)
