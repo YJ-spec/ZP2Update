@@ -31,7 +31,7 @@ def get_local_ip():
         return "127.0.0.1"
 
 
-def load_ota_index(path="/data/ota_index.yaml"):
+def load_ota_index(path="/ota/ota_index.yaml"):
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}

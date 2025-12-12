@@ -10,7 +10,7 @@ COPY run.py /run.py
 # COPY external_bridge.conf /external_bridge.conf
 COPY launcher.py /launcher.py
 COPY local_ota_server.py /local_ota_server.py
-COPY ota_index.yaml /data/ota_index.yaml
+
 
 # 拷貝前端模板 (整個資料夾)
 # COPY templates/ /templates/
